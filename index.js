@@ -79,7 +79,7 @@ const defaultOptions = {
 
 /**
  *
- * @param {{source: ?string, destination: ?string, include: ?Array<string>, sourceMaps: ?boolean, skipThirdPartyRequests: ?boolean }} userOptions
+ * @param {{source: ?string, destination: ?string, include: ?Array<string>, sourceMaps: ?boolean, skipThirdPartyRequests: ?boolean | ?string }} userOptions
  * @return {*}
  */
 const defaults = userOptions => {
@@ -261,16 +261,31 @@ const removeBlobs = async opt => {
 };
 
 /**
- * @param {{page: Page, pageUrl: string, options: {skipThirdPartyRequests: boolean, userAgent: string}, basePath: string, browser: Browser}} opt
+ * @param {{page: Page, pageUrl: string, options: {skipThirdPartyRequests: boolean | string, userAgent: string}, basePath: string, browser: Browser}} opt
  * @return {Promise}
  */
 const inlineCss = async opt => {
   const { page, pageUrl, options, basePath, browser } = opt;
+  let skipCheck = () => false;
+
+  if(options.skipThirdPartyRequests) {
+    skipCheck = (request)=>{
+      return !request.url().startsWith(basePath)
+    }
+
+    if(typeof options.skipThirdPartyRequests === "string") {
+      const skipRegEx = new RegExp(options.skipThirdPartyRequests)
+      skipCheck = (request)=>{
+        return !!request.url().match(skipRegEx)
+      }
+    }
+  }
 
   const minimalcssResult = await minimalcss.minimize({
     urls: [pageUrl],
-    skippable: request =>
-      options.skipThirdPartyRequests && !request.url().startsWith(basePath),
+    skippable: skipCheck,
+    // skippable: request =>
+    //   options.skipThirdPartyRequests && !request.url().match(/amplitude|google|segment/),
     browser: browser,
     userAgent: options.userAgent
   });
